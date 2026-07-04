@@ -46,12 +46,39 @@ https://your-domain.com/api/mcp/sse
 
 ### 2.3 鉴权
 
-平台支持以下方式，通过 HTTP Header 传递：
+平台作为 MCP Client，通过 HTTP Header 向远程 MCP Server 传递鉴权信息。支持以下方式：
 
-| 方式 | Header |
-|------|--------|
-| API Key | `X-API-Key: <key>` 或 `Authorization: ApiKey <key>` |
-| Bearer Token | `Authorization: Bearer <token>` |
+| 方式 | `auth_type` | 发送的 Header | 说明 |
+|------|-------------|---------------|------|
+| 无鉴权 | `none` | （无） | 适用于内网或公开 MCP 端点 |
+| API Key（默认 Header） | `api_key` | `{Header-Name}: <key>` | 默认 Header 名为 `X-API-Key`；可通过 `auth_header_name` 自定义，如 `X-Goog-Api-Key` |
+| API Key（Authorization） | `authorization_api_key` | `Authorization: ApiKey <key>` | 部分 MCP 网关使用的标准格式 |
+| Bearer Token | `bearer` | `Authorization: Bearer <token>` | OAuth / JWT 等 Bearer 令牌 |
+| 自定义 Header | `custom_header` | `{auth_header_name}: <key>` | 必须指定 `auth_header_name`，兼容 Cursor MCP 等第三方配置 |
+
+> **说明**：`<key>` / `<token>` 为密钥**值**的占位符；`{Header-Name}` / `{auth_header_name}` 为 Header **名称**，需与服务端要求完全一致（如 Google Stitch 使用 `X-Goog-Api-Key`，不可与 `X-API-Key` 混用）。
+
+**Cursor MCP 配置映射示例**：
+
+```json
+{
+  "servers": {
+    "stitch": {
+      "type": "http",
+      "url": "https://stitch.googleapis.com/mcp",
+      "headers": { "X-Goog-Api-Key": "<key>" }
+    }
+  }
+}
+```
+
+对应平台字段：
+
+| Cursor 字段 | 平台字段 |
+|-------------|----------|
+| `url` | `endpoint` |
+| `headers` 中的 Header 名 | `auth_type=custom_header` + `auth_header_name` |
+| `headers` 中的值 | `auth_secret` |
 
 接入方需在 MCP Server 侧校验鉴权，失败返回 HTTP 401。
 

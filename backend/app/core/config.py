@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_version: str = "0.1.0"
     cors_origins: list[str] = ["http://localhost:5173"]
+    mcp_connect_timeout_seconds: float = 10.0
+    mcp_read_timeout_seconds: float = 30.0
+    mcp_retry_attempts: int = 2
+    mcp_mock_enabled: bool = True
+    mcp_mock_domains: list[str] = ["example.com"]
 
 
 settings = Settings()

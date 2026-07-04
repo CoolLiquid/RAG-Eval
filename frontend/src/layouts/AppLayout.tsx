@@ -7,8 +7,10 @@ import {
 } from '@ant-design/icons';
 import { Avatar, Breadcrumb, Dropdown, Input, Layout, Menu, Space, Typography } from 'antd';
 import { useMemo } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
-import { colors, elevation, layout, rounded, spacing, typography } from '@/tokens';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { logout } from '@/auth/session';
+import { BrandLogo } from '@/components/BrandLogo';
+import { colors, elevation, layout, rounded, spacing } from '@/tokens';
 
 const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
@@ -24,7 +26,7 @@ const navItems = [
 const breadcrumbMap: Record<string, string> = {
   dashboard: '首页概览',
   'knowledge-bases': 'MCP 知识库',
-  new: '新建',
+  new: '挂载向导',
   'question-banks': '测评题库',
   evaluations: '测评任务',
   running: '进行中',
@@ -35,6 +37,7 @@ const breadcrumbMap: Record<string, string> = {
 
 export function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
 
   const selectedKey = useMemo(() => {
     const path = location.pathname;
@@ -71,16 +74,7 @@ export function AppLayout() {
             borderBottom: `1px solid ${colors.outlineVariant}`,
           }}
         >
-          <Text
-            strong
-            style={{ fontSize: typography.titleSm.fontSize, color: colors.onSurface }}
-          >
-            KB Eval
-          </Text>
-          <br />
-          <Text type="secondary" style={{ fontSize: typography.labelSm.fontSize }}>
-            知识库测评
-          </Text>
+          <BrandLogo showSubtitle />
         </div>
         <Menu
           mode="inline"
@@ -110,6 +104,12 @@ export function AppLayout() {
             <Dropdown
               menu={{
                 items: [{ key: 'logout', label: '退出登录' }],
+                onClick: ({ key }) => {
+                  if (key === 'logout') {
+                    logout();
+                    navigate('/login', { replace: true });
+                  }
+                },
               }}
             >
               <Space style={{ cursor: 'pointer' }}>
