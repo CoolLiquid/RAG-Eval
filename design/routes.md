@@ -34,5 +34,5 @@ settings.png
 
 - [x] Phase 0：路由骨架 + AppShell
 - [ ] Phase 1a：MCP 知识库挂载
-- [ ] Phase 1b：题库 CSV 导入
+- [x] Phase 1b：题库 CSV 导入
 - [ ] Phase 1c：测评执行 + 报告
