@@ -15,7 +15,7 @@
 
 ```
 1. 接入方按本规范实现 MCP Server
-2. 在平台「挂载 MCP 知识库」中填写 Endpoint 与鉴权信息
+2. 在平台「挂载 MCP 知识库」中粘贴 JSON 配置或填写 Endpoint 与鉴权信息
 3. 平台发现 Tools，选择检索 Tool（推荐 kb_search）
 4. 试检索验证通过后，即可发起测评
 ```
@@ -58,7 +58,65 @@ https://your-domain.com/api/mcp/sse
 
 > **说明**：`<key>` / `<token>` 为密钥**值**的占位符；`{Header-Name}` / `{auth_header_name}` 为 Header **名称**，需与服务端要求完全一致（如 Google Stitch 使用 `X-Goog-Api-Key`，不可与 `X-API-Key` 混用）。
 
-**Cursor MCP 配置映射示例**：
+接入方需在 MCP Server 侧校验鉴权，失败返回 HTTP 401。
+
+### 2.4 平台 JSON 配置导入
+
+挂载向导 Step 1 默认使用 **JSON 配置模式**，兼容 Cursor `mcp.json` 远程 Server 格式。也提供「高级表单」模式用于逐项编辑。
+
+**支持的 JSON 格式**：
+
+| 格式 | 结构 |
+|------|------|
+| Cursor 标准（推荐） | `{ "mcpServers": { "name": { "url", "headers?" } } }` |
+| 文档 servers 写法 | `{ "servers": { "name": { "type": "http", "url", "headers?" } } }` |
+| 单 server 对象 | `{ "url", "headers?" }` |
+
+**不支持**：
+
+| 类型 | 说明 |
+|------|------|
+| stdio / command | 含 `command`、`args` 且无 `url` 的配置将被拒绝 |
+| OAuth `auth` 块 | MVP 暂不支持，请改用 `headers` 传递鉴权 |
+
+**Cursor mcp.json 粘贴示例**（可直接用于平台挂载）：
+
+```json
+{
+  "mcpServers": {
+    "stitch": {
+      "url": "https://stitch.googleapis.com/mcp",
+      "headers": {
+        "X-Goog-Api-Key": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+**环境变量占位符**：若配置含 `${env:VAR}` 等占位符，平台无法读取本机环境变量，需在「密钥覆盖」输入框中填写实际密钥后再测试连接。
+
+**解析 API**：`POST /api/kb/parse-mcp-config`
+
+```json
+{
+  "config": { "mcpServers": { "...": { "url": "...", "headers": {} } } },
+  "server_name": "stitch"
+}
+```
+
+多 server 时首次解析返回 `needs_server_selection: true` 与 `available_servers` 列表，指定 `server_name` 后重新解析即可。
+
+**导出**：配置摘要卡片支持「复制 MCP 配置」，输出 Cursor 兼容 JSON（密钥脱敏）。
+
+**Cursor 字段与内部存储映射**（解析后仍存扁平字段）：
+
+| Cursor / JSON 字段 | 平台内部字段 |
+|--------------------|--------------|
+| `url` | `endpoint` |
+| `headers` | 自动推断为 `auth_type` + `auth_header_name` + `auth_secret` |
+
+**旧版 Cursor 配置映射示例**（仍支持导入）：
 
 ```json
 {
@@ -79,8 +137,6 @@ https://your-domain.com/api/mcp/sse
 | `url` | `endpoint` |
 | `headers` 中的 Header 名 | `auth_type=custom_header` + `auth_header_name` |
 | `headers` 中的值 | `auth_secret` |
-
-接入方需在 MCP Server 侧校验鉴权，失败返回 HTTP 401。
 
 ---
 

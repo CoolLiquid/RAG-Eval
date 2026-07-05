@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 
+from app.mcp.parse_config import parse_mcp_config
 from app.schemas.kb import (
     DiscoverToolsResponse,
     KnowledgeBaseCreate,
@@ -7,6 +8,8 @@ from app.schemas.kb import (
     KnowledgeBaseResponse,
     KnowledgeBaseUpdate,
     KbStatus,
+    ParseMcpConfigRequest,
+    ParseMcpConfigResponse,
     TestConnectionResponse,
     TrialSearchRequest,
     TrialSearchResponse,
@@ -23,6 +26,27 @@ def list_knowledge_bases(
 ) -> KnowledgeBaseListResponse:
     items, total = kb_service.list_knowledge_bases(search=search, status=status)
     return KnowledgeBaseListResponse(items=items, total=total)
+
+
+@router.post("/parse-mcp-config", response_model=ParseMcpConfigResponse)
+def parse_mcp_config_endpoint(data: ParseMcpConfigRequest) -> ParseMcpConfigResponse:
+    try:
+        result = parse_mcp_config(data.config, server_name=data.server_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return ParseMcpConfigResponse(
+        endpoint=result.endpoint,
+        auth_type=result.auth_type,
+        auth_header_name=result.auth_header_name,
+        auth_secret=result.auth_secret,
+        server_name=result.server_name,
+        available_servers=result.available_servers,
+        warnings=result.warnings,
+        normalized_config=result.normalized_config,
+        needs_server_selection=result.needs_server_selection,
+        has_env_placeholder=result.has_env_placeholder,
+    )
 
 
 @router.get("/{kb_id}", response_model=KnowledgeBaseResponse)

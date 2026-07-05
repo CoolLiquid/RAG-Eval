@@ -1,5 +1,7 @@
-import { Button, Card, Descriptions, Typography } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
+import { App, Button, Card, Descriptions, Typography } from 'antd';
 import { formatAuthDisplay } from '@/components/kb/authConfig';
+import { buildMcpConfigJsonFromForm } from '@/components/kb/mcpConfigUtils';
 import type { AuthType } from '@/types/kb';
 import { colors, fontFamily, rounded, spacing } from '@/tokens';
 
@@ -35,12 +37,33 @@ export function WizardSummaryCard({
   actionLoading,
   actionDisabled,
 }: WizardSummaryCardProps) {
+  const { message } = App.useApp();
+
   const authDisplay =
     authType && authSecretMasked
       ? formatAuthDisplay(authType, authSecretMasked, authHeaderName)
       : authType === 'none'
         ? '无鉴权'
         : '—';
+
+  const handleCopyMcpConfig = async () => {
+    if (!endpoint || !authType) {
+      message.warning('配置信息不完整，无法导出');
+      return;
+    }
+    const json = buildMcpConfigJsonFromForm(
+      endpoint,
+      authType,
+      authHeaderName,
+      authSecretMasked || '••••••••',
+    );
+    try {
+      await navigator.clipboard.writeText(json);
+      message.success('已复制 MCP 配置（密钥已脱敏）');
+    } catch {
+      message.error('复制失败');
+    }
+  };
 
   return (
     <Card
@@ -68,6 +91,16 @@ export function WizardSummaryCard({
         </Descriptions.Item>
         <Descriptions.Item label="鉴权">{authDisplay}</Descriptions.Item>
       </Descriptions>
+      {endpoint && authType && (
+        <Button
+          icon={<CopyOutlined />}
+          block
+          style={{ marginTop: spacing.sm }}
+          onClick={() => void handleCopyMcpConfig()}
+        >
+          复制 MCP 配置
+        </Button>
+      )}
       {actionLabel && onAction && (
         <Button
           type="primary"

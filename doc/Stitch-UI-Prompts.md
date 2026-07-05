@@ -140,7 +140,16 @@ Optimize for: Linear onboarding UX, visible progress, safe credential display (m
 ### Step 1 补充迭代 prompt
 
 ```text
-Update the MCP mount wizard Step 1: add fields for 名称, MCP Endpoint URL, 鉴权方式 radio (API Key / Bearer Token), 密钥 password input with security note "密钥不在前端明文展示"; show inline validation error state for invalid URL.
+Update the MCP mount wizard Step 1:
+- 名称 input
+- Config mode toggle: "JSON 配置" (default) | "高级表单"
+- JSON mode: monospace textarea for Cursor mcp.json format (mcpServers + url + headers), buttons "解析配置" and "复制为标准 JSON", helper text "仅支持远程 url，不支持 command/stdio"
+- Multi-server Select when mcp.json contains multiple mcpServers entries
+- Secret override password field when config contains ${env:VAR} placeholders
+- Form mode: MCP Endpoint URL, auth type select, optional custom header name, masked secret password with note "密钥不在前端明文展示"
+- Primary button "测试连接并继续"
+- Right summary card with "复制 MCP 配置" button (masked export)
+Show inline validation for invalid JSON and stdio rejection errors.
 ```
 
 ---

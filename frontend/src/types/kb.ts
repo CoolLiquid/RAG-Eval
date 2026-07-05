@@ -76,3 +76,21 @@ export interface KbListFilters {
   search?: string;
   status?: KbStatus;
 }
+
+export interface ParseMcpConfigRequest {
+  config: Record<string, unknown>;
+  server_name?: string | null;
+}
+
+export interface ParseMcpConfigResponse {
+  endpoint: string | null;
+  auth_type: AuthType | null;
+  auth_header_name: string | null;
+  auth_secret: string;
+  server_name: string | null;
+  available_servers: string[];
+  warnings: string[];
+  normalized_config: Record<string, unknown>;
+  needs_server_selection: boolean;
+  has_env_placeholder: boolean;
+}

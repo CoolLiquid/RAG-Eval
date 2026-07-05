@@ -60,6 +60,8 @@ python -m venv .venv
 
 pip install -r requirements.txt
 copy .env.example .env
+
+.\.venv\Scripts\Activate.ps1
 uvicorn app.main:app --reload --port 8000
 ```
 

@@ -82,3 +82,21 @@ class ChunkResponse(BaseModel):
 class TrialSearchResponse(BaseModel):
     chunks: list[ChunkResponse]
     count: int
+
+
+class ParseMcpConfigRequest(BaseModel):
+    config: dict
+    server_name: str | None = None
+
+
+class ParseMcpConfigResponse(BaseModel):
+    endpoint: str | None = None
+    auth_type: AuthType | None = None
+    auth_header_name: str | None = None
+    auth_secret: str = ""
+    server_name: str | None = None
+    available_servers: list[str] = []
+    warnings: list[str] = []
+    normalized_config: dict = {}
+    needs_server_selection: bool = False
+    has_env_placeholder: bool = False

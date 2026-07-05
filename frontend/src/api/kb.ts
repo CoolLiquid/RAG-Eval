@@ -6,6 +6,8 @@ import type {
   KnowledgeBaseCreatePayload,
   KnowledgeBaseListResponse,
   KnowledgeBaseUpdatePayload,
+  ParseMcpConfigRequest,
+  ParseMcpConfigResponse,
   TestConnectionResponse,
   TrialSearchResponse,
 } from '@/types/kb';
@@ -56,5 +58,12 @@ export async function trialKbSearch(
     query,
     top_k: topK,
   });
+  return data;
+}
+
+export async function parseMcpConfig(
+  payload: ParseMcpConfigRequest,
+): Promise<ParseMcpConfigResponse> {
+  const { data } = await apiClient.post<ParseMcpConfigResponse>('/kb/parse-mcp-config', payload);
   return data;
 }

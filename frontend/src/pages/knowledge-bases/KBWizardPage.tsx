@@ -24,6 +24,7 @@ import {
   createKb,
   discoverKbTools,
   fetchKbById,
+  parseMcpConfig,
   testKbConnection,
   trialKbSearch,
   updateKb,
@@ -31,11 +32,20 @@ import {
 import { ChunkPreviewCard } from '@/components/kb/ChunkPreviewCard';
 import { AuthConfigFields } from '@/components/kb/AuthConfigFields';
 import { needsAuthSecret } from '@/components/kb/authConfig';
+import { McpConfigEditor } from '@/components/kb/McpConfigEditor';
+import {
+  applyParseResultToForm,
+  buildMcpConfigJsonFromForm,
+  DEFAULT_MCP_CONFIG_TEMPLATE,
+  parseJsonSafe,
+} from '@/components/kb/mcpConfigUtils';
 import { WizardSummaryCard } from '@/components/kb/WizardSummaryCard';
-import type { AuthType, Chunk, ToolInfo } from '@/types/kb';
+import type { AuthType, Chunk, ParseMcpConfigResponse, ToolInfo } from '@/types/kb';
 import { colors, spacing } from '@/tokens';
 
 const { Title, Paragraph, Text } = Typography;
+
+type ConfigMode = 'json' | 'form';
 
 type ConnectionFormValues = {
   name: string;
@@ -65,6 +75,10 @@ export function KBWizardPage() {
   const [trialQuery, setTrialQuery] = useState('退货政策是什么');
   const [trialResults, setTrialResults] = useState<Chunk[]>([]);
   const [summary, setSummary] = useState<Partial<ConnectionFormValues>>({});
+  const [configMode, setConfigMode] = useState<ConfigMode>('json');
+  const [mcpJsonText, setMcpJsonText] = useState(DEFAULT_MCP_CONFIG_TEMPLATE);
+  const [secretOverride, setSecretOverride] = useState('');
+  const [jsonParsed, setJsonParsed] = useState(false);
 
   const [connectionForm] = Form.useForm<ConnectionFormValues>();
 
@@ -92,6 +106,15 @@ export function KBWizardPage() {
       auth_header_name: existingKb.auth_header_name ?? undefined,
       auth_secret: '',
     });
+    setMcpJsonText(
+      buildMcpConfigJsonFromForm(
+        existingKb.endpoint,
+        existingKb.auth_type,
+        existingKb.auth_header_name,
+        existingKb.auth_secret_masked,
+      ),
+    );
+    setJsonParsed(true);
   }, [existingKb, connectionForm]);
 
   const createMutation = useMutation({ mutationFn: createKb });
@@ -144,6 +167,99 @@ export function KBWizardPage() {
     ...(values.auth_type === 'none' ? { auth_secret: '' } : {}),
   });
 
+  const handleMcpParsed = (result: ParseMcpConfigResponse) => {
+    const fields = applyParseResultToForm(result, secretOverride);
+    if (!fields) return;
+    connectionForm.setFieldsValue({
+      endpoint: fields.endpoint,
+      auth_type: fields.auth_type,
+      auth_header_name: fields.auth_header_name,
+      auth_secret: fields.auth_secret || connectionForm.getFieldValue('auth_secret'),
+    });
+    setJsonParsed(true);
+  };
+
+  const handleConfigModeChange = (mode: ConfigMode) => {
+    if (mode === 'json' && configMode === 'form') {
+      const endpoint = connectionForm.getFieldValue('endpoint');
+      const formAuthType = connectionForm.getFieldValue('auth_type');
+      const formAuthHeaderName = connectionForm.getFieldValue('auth_header_name');
+      const formSecret = connectionForm.getFieldValue('auth_secret');
+      if (endpoint && formAuthType) {
+        const masked = formSecret || existingKb?.auth_secret_masked || '••••••••';
+        setMcpJsonText(
+          buildMcpConfigJsonFromForm(endpoint, formAuthType, formAuthHeaderName, masked),
+        );
+      }
+    }
+    setConfigMode(mode);
+  };
+
+  const resolveJsonModeValues = async (): Promise<ConnectionFormValues | null> => {
+    const name = connectionForm.getFieldValue('name');
+    if (!name?.trim()) {
+      message.error('请输入知识库名称');
+      return null;
+    }
+
+    const parsed = parseJsonSafe(mcpJsonText);
+    if (!parsed.ok) {
+      message.error(parsed.error);
+      return null;
+    }
+
+    try {
+      const result = await parseMcpConfig({
+        config: parsed.value as Record<string, unknown>,
+      });
+
+      if (result.needs_server_selection) {
+        message.error('检测到多个 MCP Server，请选择实例并点击「解析配置」');
+        return null;
+      }
+
+      if (result.has_env_placeholder && !secretOverride.trim() && !editId) {
+        message.error('配置含环境变量占位符，请填写密钥覆盖');
+        return null;
+      }
+
+      const fields = applyParseResultToForm(result, secretOverride);
+      if (!fields) {
+        message.error('请先点击「解析配置」');
+        return null;
+      }
+
+      if (
+        needsAuthSecret(fields.auth_type) &&
+        !editId &&
+        !fields.auth_secret?.trim() &&
+        !secretOverride.trim()
+      ) {
+        message.error('请输入密钥或 Token');
+        return null;
+      }
+
+      const values: ConnectionFormValues = {
+        name: name.trim(),
+        endpoint: fields.endpoint,
+        auth_type: fields.auth_type,
+        auth_header_name: fields.auth_header_name,
+        auth_secret: secretOverride.trim() || fields.auth_secret,
+      };
+
+      connectionForm.setFieldsValue(values);
+      setJsonParsed(true);
+      return values;
+    } catch (err: unknown) {
+      const detail =
+        err && typeof err === 'object' && 'response' in err
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : undefined;
+      message.error(typeof detail === 'string' ? detail : '配置解析失败');
+      return null;
+    }
+  };
+
   const handleStep1Next = async (values: ConnectionFormValues) => {
     if (needsAuthSecret(values.auth_type) && !editId && !values.auth_secret?.trim()) {
       message.error('请输入密钥或 Token');
@@ -185,6 +301,25 @@ export function KBWizardPage() {
       setCurrentStep(1);
     } catch {
       message.error('连接失败，请检查 Endpoint 与鉴权信息');
+    }
+  };
+
+  const handleStep1Submit = async () => {
+    if (configMode === 'json') {
+      if (!jsonParsed) {
+        message.warning('请先点击「解析配置」');
+      }
+      const values = await resolveJsonModeValues();
+      if (!values) return;
+      await handleStep1Next(values);
+      return;
+    }
+
+    try {
+      const values = await connectionForm.validateFields();
+      await handleStep1Next(values);
+    } catch {
+      message.warning('请完善连接配置后再测试');
     }
   };
 
@@ -285,8 +420,6 @@ export function KBWizardPage() {
                 layout="vertical"
                 requiredMark={false}
                 initialValues={{ auth_type: 'api_key' as AuthType }}
-                onFinish={handleStep1Next}
-                onFinishFailed={() => message.warning('请完善连接配置后再测试')}
               >
                 <Form.Item
                   label="名称"
@@ -295,30 +428,70 @@ export function KBWizardPage() {
                 >
                   <Input placeholder="例：售后知识库" />
                 </Form.Item>
-                <Form.Item
-                  label="MCP Endpoint URL"
-                  name="endpoint"
-                  rules={[
-                    { required: true, message: '请输入 Endpoint URL' },
-                    {
-                      type: 'url',
-                      message: '请输入有效的 http(s) URL',
-                    },
-                  ]}
-                >
-                  <Input placeholder="https://your-domain.com/mcp" />
+
+                <Form.Item label="配置方式">
+                  <Radio.Group
+                    value={configMode}
+                    onChange={(e) => handleConfigModeChange(e.target.value as ConfigMode)}
+                  >
+                    <Radio.Button value="json">JSON 配置</Radio.Button>
+                    <Radio.Button value="form">高级表单</Radio.Button>
+                  </Radio.Group>
                 </Form.Item>
-                <AuthConfigFields editMode={Boolean(editId)} />
+
+                {configMode === 'json' ? (
+                  <McpConfigEditor
+                    value={mcpJsonText}
+                    onChange={(text) => {
+                      setMcpJsonText(text);
+                      setJsonParsed(false);
+                    }}
+                    onParsed={handleMcpParsed}
+                    secretOverride={secretOverride}
+                    onSecretOverrideChange={setSecretOverride}
+                  />
+                ) : (
+                  <>
+                    <Form.Item
+                      label="MCP Endpoint URL"
+                      name="endpoint"
+                      rules={[
+                        { required: true, message: '请输入 Endpoint URL' },
+                        {
+                          type: 'url',
+                          message: '请输入有效的 http(s) URL',
+                        },
+                      ]}
+                    >
+                      <Input placeholder="https://your-domain.com/mcp" />
+                    </Form.Item>
+                    <AuthConfigFields editMode={Boolean(editId)} />
+                  </>
+                )}
+
+                <Form.Item name="endpoint" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="auth_type" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="auth_header_name" hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="auth_secret" hidden>
+                  <Input />
+                </Form.Item>
+
                 <Space>
                   <Button onClick={() => navigate('/knowledge-bases')}>取消</Button>
                   <Button
                     type="primary"
-                    htmlType="submit"
                     loading={
                       createMutation.isPending ||
                       updateMutation.isPending ||
                       testMutation.isPending
                     }
+                    onClick={() => void handleStep1Submit()}
                   >
                     测试连接并继续
                   </Button>
