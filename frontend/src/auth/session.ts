@@ -62,6 +62,11 @@ export function login(username: string, password: string, remember: boolean): bo
   return true;
 }
 
+export function getCurrentUsername(): string | null {
+  migrateLegacySession();
+  return readSession()?.username ?? null;
+}
+
 export function logout(): void {
   sessionStorage.removeItem(AUTH_SESSION_KEY);
   localStorage.removeItem(AUTH_SESSION_KEY);

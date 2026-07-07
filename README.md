@@ -56,7 +56,6 @@ cd backend
 python -m venv .venv
 
 # Windows
-.venv\Scripts\activate
 
 pip install -r requirements.txt
 copy .env.example .env
@@ -68,7 +67,7 @@ uvicorn app.main:app --reload --port 8000
 后端 API 文档：http://localhost:8000/api/docs
 
 ### 3. 启动前端
-
+j
 ```bash
 cd frontend
 npm install

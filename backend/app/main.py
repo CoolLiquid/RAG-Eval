@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import evaluations, health, kb, question_banks
+from app.api import settings as settings_api
 from app.core.config import settings
 
 app = FastAPI(
@@ -23,3 +24,4 @@ app.include_router(health.router, prefix="/api")
 app.include_router(kb.router, prefix="/api")
 app.include_router(evaluations.router, prefix="/api")
 app.include_router(question_banks.router, prefix="/api")
+app.include_router(settings_api.router, prefix="/api")
